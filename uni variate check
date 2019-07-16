@@ -28,14 +28,16 @@ for i in 1:1:size(full,2)
  
 ## write a function col_check to do it, just need to indicate your dataframe name
 function col_check(full)
-  for i in 1:1:size(full,2)
-    if  eltype(full[i]) == String || eltype(full[i]) == Union{Missing, String}
+    for i in 3:1:size(full,2)
+        if  eltype(full[i]) == String || eltype(full[i]) == Union{Missing, String}
         println("Column Name:",names(full)[i])  ## shows out your column name
         println(freqtable(full[i]))
         println() 
-    elseif  eltype(full[i]) == Union{Missing, Date} || eltype(full[i]) ==  Date
+            
+        elseif  eltype(full[i]) == Union{Missing, Date} || eltype(full[i]) ==  Date
             continue
-    elseif eltype(full[i]) !==String
+                
+        elseif eltype(full[i]) !==String
                println("Column Name:",names(full)[i])  ## shows out your column name
                println(summarystats(full[i]))
                println()
