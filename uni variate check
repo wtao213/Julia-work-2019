@@ -7,6 +7,7 @@
 
 ## questions to be solved: 1. string like id, or numeric for id, how to detect them, and stop output of them
 ##                         2. how about the date, Union{Missing, Date} data type???
+##                         3. add a dispatch for a list of cols, not the full dataframe
 
 for i in 1:1:size(full,2)
     if  eltype(full[i]) == String || eltype(full[i]) == Union{Missing, String}
