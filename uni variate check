@@ -1,0 +1,48 @@
+## July,16th,2019
+## write a function to give you general info about each column
+
+## full is the name of the dataframe, the date data type here will be skipped, only string and numeric will show up
+## string shows freqtable, numeric shows summarystats
+
+
+## questions to be solved: 1. string like id, or numeric for id, how to detect them, and stop output of them
+##                         2. how about the date, Union{Missing, Date} data type???
+
+for i in 1:1:size(full,2)
+    if  eltype(full[i]) == String || eltype(full[i]) == Union{Missing, String}
+        println("Column Name:",names(full)[i])  ## shows out your column name
+        println(freqtable(full[i]))
+        println() ## leave some space to make it more visuable
+    elseif  eltype(full[i]) == Union{Missing, Date} || eltype(full[i]) ==  Date
+            continue
+    elseif eltype(full[i]) !==String
+               println("Column Name:",names(full)[i])  ## shows out your column name
+               println(summarystats(full[i]))
+               println()
+        end
+    end
+        
+ 
+ 
+ 
+ 
+## write a function col_check to do it, just need to indicate your dataframe name
+function col_check(full)
+  for i in 1:1:size(full,2)
+    if  eltype(full[i]) == String || eltype(full[i]) == Union{Missing, String}
+        println("Column Name:",names(full)[i])  ## shows out your column name
+        println(freqtable(full[i]))
+        println() 
+    elseif  eltype(full[i]) == Union{Missing, Date} || eltype(full[i]) ==  Date
+            continue
+    elseif eltype(full[i]) !==String
+               println("Column Name:",names(full)[i])  ## shows out your column name
+               println(summarystats(full[i]))
+               println()
+        end
+    end
+end
+
+
+## when run your function
+col_check(df)
