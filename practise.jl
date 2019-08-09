@@ -73,7 +73,7 @@ length(unique(df[!,:AccountClass]))
 
 ## filter rows exist in a list of strings, string column has no missing
 df2 = df[[x in ["IN","FX"] for x in df[!,:AccountClass]], :]
-## if the column contain missing value, then doesn't work, have to add in filter in begining to filter out missing
+## if the column contain missing value, then doesn't work, have to add in filter to filter out missing, these three conditions' sequence doesn't matter
 WM_WM = df[(df.ind_t12 .!== missing) .& (df.ind_t0 .== "WM") .& (df.ind_t12 .== "WM") , :]
 
 
@@ -124,3 +124,44 @@ size(df)   # (251882, 26)
 
 ## plotting
 histogram(df[!,:tenure],group=df[!,:STA_Status],fillalpha=0.4,linealpha=0.1,nbins=0:1:102,title="Account Tenure",xlabel="month",ylabel="account Count")
+
+
+
+## be carefule when use mutli-dimention arry for loop
+a = ["a","b","c"]
+b = ["a","b","c","d"]
+c= [x == y ? "euqal" : "not" for x in a,y in b]
+
+## results
+3×4 Array{String,2}:
+ "euqal"  "not"    "not"    "not"
+ "not"    "euqal"  "not"    "not"
+ "not"    "not"    "euqal"  "not"
+
+ ## using zip to make them in pairs
+ a = ["a","c","b","c"]
+ b = ["a","b","c","d"]
+ c= [x == y ? "euqal" : "not" for (x,y) in zip(a,b)]
+
+ # results 
+ "euqal"
+ "not"  
+ "not"  
+ "not" 
+
+
+ ## ranking function  floor(tiedrank(x)*k/n+1) n is siae of non-missing value, k is the group uou use.
+ df1[!,:asset_rank] = floor.(Int,  tiedrank(df1[!,:TotalAssets_ttl_t12])*10/(length(df1[!,:TotalAssets_ttl_t12]) +1))
+ ## function to replace proc rank
+ ## 1. indicate your group number
+function rank(x::AbstractVector,k::Integer)
+    ceil.(Int,tiedrank(x)*k/(length(x) +1))
+end
+## 2. indicate the interval you want
+function rank(x::AbstractVector,p::AbstractFloat)
+    0< p <=1 || error("p must between 0 to 1")
+isinteger(1/p) || error("need ratio be exact divided by 1")
+ceil.(Int,tiedrank(x)/(p*(length(x)+1)))
+end
+
+rank(df1[!,:TotalAssets_ttl_t12],10)
