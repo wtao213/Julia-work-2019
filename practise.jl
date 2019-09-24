@@ -178,13 +178,16 @@ rank(df1[!,:TotalAssets_ttl_t12],10)
 ## scatter plot and line plot in one
 ## function for draw the logit plot, df is the original function,
 ## x is the variable on x axies, y is the target variable, k is the number indicate bins group
+## logit formula y=log(p/(1-p))
+## almost equal to log((sum_of_1_in_gourp + 1)/(count_of_group - sum_of_1_in_gourp + 1)
 function logit_plot(df::DataFrame,x::Symbol,k::Integer,y::Symbol)
 
       df[!,:rank] =  ceil.(Int,tiedrank(df[!,x])*k/(length(df[!,x]) +1))
-      df1 = by(df,:rank, target = y =>mean, a = x => mean)
+      df1 = by(df,:rank, target = y =>mean, a = x => mean, n= y=>length, cls = y => sum)
+      df1[!,:logit] = [log( (c + 1)/ (d - c + 1) ) for (c,d) in zip(df1[!,:cls],df1[!,:n])]
 
-      scatter(df1[!,:a],df1[!,:target])
-      plot!(df1[!,:a],df1[!,:target])
+      scatter(df1[!,:a],df1[!,:logit])
+      plot!(df1[!,:a],df1[!,:logit])
 end
 
 logit_plot(df,:TotalAssets_ttl_15_90,20,:target)
