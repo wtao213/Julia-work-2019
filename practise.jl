@@ -165,3 +165,27 @@ ceil.(Int,tiedrank(x)/(p*(length(x)+1)))
 end
 
 rank(df1[!,:TotalAssets_ttl_t12],10)
+
+
+
+
+
+
+
+## Sep,24th,2019
+## function for logit plot
+
+## scatter plot and line plot in one
+## function for draw the logit plot, df is the original function,
+## x is the variable on x axies, y is the target variable, k is the number indicate bins group
+function logit_plot(df::DataFrame,x::Symbol,k::Integer,y::Symbol)
+
+      df[!,:rank] =  ceil.(Int,tiedrank(df[!,x])*k/(length(df[!,x]) +1))
+      df1 = by(df,:rank, target = y =>mean, a = x => mean)
+
+      scatter(df1[!,:a],df1[!,:target])
+      plot!(df1[!,:a],df1[!,:target])
+end
+
+logit_plot(df,:TotalAssets_ttl_15_90,20,:target)
+
