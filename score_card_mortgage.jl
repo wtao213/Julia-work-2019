@@ -455,3 +455,247 @@ cus[!,:ttl_score] = cus[!,:age_score] + cus[!,:Equity_score] + cus[!,:act_score]
 
 
 ## rank 4:
+# trade last quarter
+trade_cuts =[1,5,10,30,maximum(skipmissing(cus[!,:trade_time_lq]))]
+cus[!,:trade_ca] =  cut(cus[!,:trade_time_lq], trade_cuts, extend = true)
+
+mycode =nothing
+mycode = Dict(
+                "[1, 5)"  => 1,
+                "[5, 10)"   => 2,
+                "[10, 30)"  => 3,
+                "[30, 20557]" => 4,
+                 missing  => 0,
+                )
+cus[!,:trade_score]= [get(mycode, s, missing) for s in cus[!,:trade_ca]]
+
+freqtable(cus[!,:trade_score])
+
+
+
+## rank 5: Tenure
+tenure_cuts =[0,3,36,60,maximum(skipmissing(cus[!,:MTD]))]
+cus[!,:tenure_ca] =  cut(cus[!,:MTD], tenure_cuts, extend = true)
+levels(cus[!,:tenure_ca])
+typeof(cus[!,:tenure_ca])
+
+#
+mycode =nothing
+mycode = Dict(
+            "[0, 3)"    => - 99,
+            "[3, 36)"   => 10,
+            "[36, 60)"  => 7,
+            "[60, 191]" => 4,
+            )
+cus[!,:tenure_score]= [get(mycode, s, missing) for s in cus[!,:tenure_ca]]
+
+
+## get rank version 2
+cus[!,:ttl_score_v2] = cus[!,:trade_score] + cus[!,:ttl_score] + cus[!,:tenure_score]
+
+
+
+##  look at score two version
+[names(cus) eltype.(eachcol(cus))]
+cus[!,:rank_gp2] = rank(cus[!,:ttl_score_v2],10)
+CSV.write("C:\\Users\\012790\\Desktop\\scorecard_mortgage\\cus_score_full_318k_sr.csv",cus)
+
+sm_df = by(cus, :rank_gp2,[:age_today,:EquityCAD03avg ,:act_acct ,:MTD, :trade_time_lq] =>
+            x->(age_avg = mean(x.age_today) , equity_avg=mean(skipmissing(x.EquityCAD03avg)),
+                act_avg = mean(x.act_acct), tenure = mean(x.MTD), N=length(x.act_acct)
+               ,tading = mean(skipmissing(x.trade_time_lq))))
+
+## add in self reported info to get an idea
+# do some clearence to the income
+
+
+sm_df = by(cus, :rank_gp2
+          ,[:age_today,:EquityCAD03avg ,:act_acct ,:MTD, :trade_time_lq,:Income,:LiquidAsset,:NetWorth] =>
+            x->(age_avg       = mean(x.age_today)
+                ,equity_avg   = mean(skipmissing(x.EquityCAD03avg))
+                ,act_avg      = mean(x.act_acct)
+                ,tenure       = mean(x.MTD)
+                ,N            = length(x.act_acct)
+                ,tading       = mean(skipmissing(x.trade_time_lq))
+                ,Income       = mean(skipmissing(x.Income))
+                ,LiquidAsset  = mean(skipmissing(x.LiquidAsset))
+                ,NetWorth     = mean(skipmissing(x.NetWorth))
+                ))
+
+
+########################################################
+# part 5: start date: April,23rd, 2020
+# additional correlation test
+#
+cus = CSV.read("C:\\Users\\012790\\Desktop\\scorecard_mortgage\\cus_score_full_318k_sr.csv")
+[names(cus) eltype.(eachcol(cus))]
+
+
+## heatmap of income vs. equity
+## heatmap of income vs. age
+
+histogram2d(cus[!,:Income],cus[!,:age_today],nbins=25,xlabel="Overall Satisfy",ylabel="refer friends",
+            c=ColorGradient(:blues),title="Overall Satisfy vs. refer friends")
+
+
+# have to remove missing first
+a= cus[(cus.Income .!== missing) .& (cus.Income .<= 250000) ,:]
+
+histogram2d(a[!,:age_today],a[!,:Income]
+            ,nbins=20,xlabel="Age Today",ylabel="SR Income"
+            ,yformatter = x->string("\$",Int(x/1e3),"K"),yticks = 0:25000:250000
+            ,xticks= 20:5:100
+            ,c=ColorGradient(:blues),title="Age Today vs. SR Income")
+
+
+
+## heatmap of income vs. equity
+# if remove missing of income and equity03avg, then only 287k left
+quantile(skipmissing(cus[!,:EquityCAD03avg]),0:0.1:1)
+quantile(skipmissing(cus[!,:EquityCAD03avg]),0.99)
+a= nothing
+a= cus[(cus.Income .!== missing) .& (cus.EquityCAD03avg .!== missing) ,:]
+a= a[(a.EquityCAD03avg .<= 200000) .& (a.Income .<= 250000) .& (a.EquityCAD03avg .>= 0),:]
+
+histogram2d(a[!,:EquityCAD03avg],a[!,:Income]
+            ,nbins=20,xlabel="Equity in March",ylabel="SR Income"
+            ,yformatter = x->string("\$",Int(x/1e3),"K"),yticks = 0:25000:250000
+            ,xformatter = x->string("\$",Int(x/1e3),"K")
+            ,c=ColorGradient(:blues),title="Equity in March vs. SR Income")
+
+
+
+################
+## line plot based on median quantile number, income vs age today
+[names(cus) eltype.(eachcol(cus))]
+
+# look at reported data at median level to avoid the impact of outliers
+sm_df = by(cus, :rank_gp2
+          ,[:age_today,:EquityCAD03avg ,:act_acct ,:MTD, :trade_time_lq,:Income,:LiquidAsset,:NetWorth] =>
+            x->(age_avg       = mean(x.age_today)
+                ,equity_avg   = mean(skipmissing(x.EquityCAD03avg))
+                ,act_avg      = mean(x.act_acct)
+                ,tenure       = mean(x.MTD)
+                ,N            = length(x.act_acct)
+                ,tading       = mean(skipmissing(x.trade_time_lq))
+                ,Income       = median(skipmissing(x.Income))
+                ,LiquidAsset  = median(skipmissing(x.LiquidAsset))
+                ,NetWorth     = median(skipmissing(x.NetWorth))
+                ))
+
+sm_df = nothing
+## get dataset by age groups
+ai_df = by(cus,:age_ca
+            ,[:age_today,:EquityCAD03avg ,:act_acct ,:MTD, :trade_time_lq,:Income,:LiquidAsset,:NetWorth] =>
+            x->(age_avg       = mean(x.age_today)
+            ,equity_avg   = mean(skipmissing(x.EquityCAD03avg))
+            ,act_avg      = mean(x.act_acct)
+            ,tenure       = mean(x.MTD)
+            ,N            = length(x.act_acct)
+            ,tading       = mean(skipmissing(x.trade_time_lq))
+            ,LiquidAsset  = median(skipmissing(x.LiquidAsset))
+            ,NetWorth     = median(skipmissing(x.NetWorth))
+            ,median_Income       = median(skipmissing(x.Income))
+            ,Income_10       = quantile(skipmissing(x.Income),0.10)
+            ,Income_25       = quantile(skipmissing(x.Income),0.25)
+            ,Income_75       = quantile(skipmissing(x.Income),0.75)
+            ,Income_90       = quantile(skipmissing(x.Income),0.90)
+            ,Income_98       = quantile(skipmissing(x.Income),0.98)
+            ))
+
+
+
+## by real age
+ai_df = by(cus,:age_today
+            ,[:age_today,:EquityCAD03avg ,:act_acct ,:MTD, :trade_time_lq,:Income,:LiquidAsset,:NetWorth] =>
+            x->(age_avg       = mean(x.age_today)
+            ,equity_avg   = mean(skipmissing(x.EquityCAD03avg))
+            ,act_avg      = mean(x.act_acct)
+            ,tenure       = mean(x.MTD)
+            ,N            = length(x.act_acct)
+            ,tading       = mean(skipmissing(x.trade_time_lq))
+            ,LiquidAsset  = median(skipmissing(x.LiquidAsset))
+            ,NetWorth     = median(skipmissing(x.NetWorth))
+            ,median_Income       = median(skipmissing(x.Income))
+            ,Income_10       = quantile(skipmissing(x.Income),0.10)
+            ,Income_25       = quantile(skipmissing(x.Income),0.25)
+            ,Income_75       = quantile(skipmissing(x.Income),0.75)
+            ,Income_90       = quantile(skipmissing(x.Income),0.90)
+            ,Income_98       = quantile(skipmissing(x.Income),0.98)
+            ))
+
+
+
+## version 1: age bin group
+## plot on ai_df, and we need sort first
+# this is one column: sort!(ai_df[!,:age_ca])
+ai_df = sort!(ai_df,(:age_ca))
+
+plot(ai_df[!,:age_ca], ai_df[!,:Income_90],  label = ("Income 90%")
+      ,yformatter = x->string("\$",Int(x/1e3),"K")
+      ,yticks = 0:20000:200000
+      ,title="Age vs. KYC Self reported Income"
+      ,legend=:topleft)
+plot!(ai_df[!,:age_ca], ai_df[!,:median_Income],  label = ("Median Income"))
+plot!(ai_df[!,:age_ca], ai_df[!,:Income_10],  label = ("Income 10%"))
+plot!(ai_df[!,:age_ca], ai_df[!,:Income_25],  label = ("Income 25%"))
+plot!(ai_df[!,:age_ca], ai_df[!,:Income_75],  label = ("Income 75%"))
+
+
+
+
+## version 2: real age
+# only look at customers' age less than 90
+ai_df = sort!(ai_df,(:age_today))
+b = ai_df[ai_df.age_today .<= 80 ,:]
+
+plot(b[!,:age_today], b[!,:Income_90],  label = ("Income 90%")
+      ,yformatter = x->string("\$",Int(x/1e3),"K")
+      ,yticks = 0:20000:200000
+      ,xticks = 20:5:80
+      ,title=" KYC Self reported Income Trajectory"
+      ,xlabel="Age",ylabel="KYC Income"
+      ,legend=:best
+      )
+plot!(b[!,:age_today], b[!,:median_Income],  label = ("Median Income"))
+plot!(b[!,:age_today], b[!,:Income_10],      label = ("Income 10%"))
+plot!(b[!,:age_today], b[!,:Income_25],      label = ("Income 25%"))
+plot!(b[!,:age_today], b[!,:Income_75],      label = ("Income 75%"))
+
+b=nothing
+
+######################################################
+# part 6: validate the survey customer
+# :survey_group, total 451 survey, and now for still active there are 425
+
+freqtable(cus[!,:survey_group])
+t = freqtable(cus[!,:survey_group],cus[!,:rank_gp2])
+
+
+suvey_df = by(cus,:survey_group
+            ,[:age_today,:EquityCAD03avg ,:act_acct ,:MTD, :trade_time_lq,:Income,:LiquidAsset,:NetWorth,:rank_gp2] =>
+            x->(
+             age_avg      = mean(x.age_today)
+            ,equity_avg   = mean(skipmissing(x.EquityCAD03avg))
+            ,act_avg      = mean(x.act_acct)
+            ,tenure       = mean(x.MTD)
+            ,N            = length(x.act_acct)
+            ,tading       = mean(skipmissing(x.trade_time_lq))
+            ,LiquidAsset  = median(skipmissing(x.LiquidAsset))
+            ,NetWorth     = median(skipmissing(x.NetWorth))
+            ,median_Income   = median(skipmissing(x.Income))
+            ,rank_gp2_10       = quantile(skipmissing(x.rank_gp2),0.10)
+            ,rank_gp2_25       = quantile(skipmissing(x.rank_gp2),0.25)
+            ,rank_gp2_50       = quantile(skipmissing(x.rank_gp2),0.50)
+            ,rank_gp2_75       = quantile(skipmissing(x.rank_gp2),0.75)
+            ,rank_gp2_90       = quantile(skipmissing(x.rank_gp2),0.90)
+            ,rank_gp2_98       = quantile(skipmissing(x.rank_gp2),0.98)
+            ))
+
+
+
+## distrivution plot
+##
+histogram(cus[cus.survey_group .== "interested",:rank_gp2],fillalpha = 0.4, linealpha = 0.1
+      ,nbins = 1:10,xlabel ="Rank Score", ylabel = "customer count"
+      ,title = "Rank score of survey customers",legend = false)
