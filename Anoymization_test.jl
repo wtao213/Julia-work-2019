@@ -56,8 +56,7 @@ r"^\D\d\D\d\D\d$"
 df[!,:PC_ref] = [ismissing(x) ? missing :
                  occursin(r"^\D\d\D\d\D\d$",x) ? uppercase(x) : missing
                  for x in df[!,:PostalCode]]
-# after check there are 155,007 records compare with original 157,304
-# after change format, there are 154,684
+
 freqtable(df[!,:PC_ref])
 
 
@@ -66,9 +65,9 @@ freqtable(df[!,:PC_ref])
 
 ################################################
 # real work start from, check your postal code
-# group by postal code to check the customer larger than 50
+
 a = groupby(df, :PC_ref)
-# out of the 157304 postal code, only 47 have customer greater than 50
+
 b = combine(a, :PC_ref => length => :count )
 b[b.count .>=50,:]
 
@@ -99,8 +98,7 @@ histogram(collect(skipmissing(b[!,:count])),fillalpha = 0.4, linealpha = 0.1,leg
 
 
 ## check left 5 characters
-# then there are 67,753 value, and only 189 have customer greater than 50
-# 65,043 PC in pc_ref, and 14,598 customer covered
+
 df[!, :Postal_l5] = [
       ismissing(x) ? missing : chop(strip(x), head = 0, tail = 1)
       for x in df[!,:PC_ref]
@@ -108,7 +106,7 @@ df[!, :Postal_l5] = [
 
 freqtable(df[!,:Postal_l5])
 
-# out of the 67751 records, only 189 have customer greater than 50
+
 a = groupby(df, :Postal_l5)
 b = combine(a, :Postal_l5 => length => :count )
 b[b.count .>=50,:]
@@ -131,7 +129,7 @@ histogram(collect(skipmissing(b[!,:count])),fillalpha = 0.4, linealpha = 0.1,leg
 
 
 ## check left 4 characters
-# then there are 9,161 value, and 1,989 has larger than 50
+
 df[!,:Postal_l4] = [ ismissing(x) ? missing : chop(strip(x),head=0,tail=2) for x in df[!,:PC_ref]]
 
 freqtable(df[!,:Postal_l4])
@@ -177,7 +175,7 @@ prop(t)
 freqtable(c[!,:CityName])
 ##
 ## check left 3 characters
-# then there are 2,947 value, and 1,098 has larger than 50
+
 df[!,:Postal_l3] = [ ismissing(x) ? missing : chop(strip(x),head=0,tail=3) for x in df[!,:PC_ref]]
 
 freqtable(df[!,:Postal_l3])
@@ -206,7 +204,7 @@ histogram(collect(skipmissing(b[!,:count]))
 
 #
 # check left 2 characters
-# then there are 2,947 value, and 1,098 has larger than 50
+
 df[!,:Postal_l2] = [ ismissing(x) ? missing : chop(strip(x),head=0,tail=4) for x in df[!,:PC_ref]]
 
 freqtable(df[!,:Postal_l2])
@@ -300,25 +298,8 @@ end
 Anonymize_Check(df,[:age_today ,:MTD])
 
 
-## test results to compare
-tt = CSV.read("C:\\Users\\012790\\Desktop\\TU_prepare\\sample.csv")
-
-[names(tt) eltype.(eachcol(tt))]
-
-l= names(tt)
-l[2:11]
-
-Anonymize_Check(tt,[:age_today ,:MTD])
-Anonymize_Check(tt,l[2:11])
-
-
-test  = groupby(tt, l[2:11])
-test2 = combine(test, :PrimaryClientID =>length => :cus_count)
-
-count_values_of_allvar = length(test2[test2.cus_count .> 1,:cus_count])
-new_row_count          = sum(test2[test2.cus_count .> 1,:cus_count])
-suppressed_row_count   = sum(test2[test2.cus_count .== 1,:cus_count])
 
 
 
-avg_risk = new_row_count==0 ? "--" : count_values_of_allvar/new_row_count
+
+
