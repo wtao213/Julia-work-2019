@@ -1,5 +1,6 @@
 
 
+
 ## julia practise
 ## start date: July,22nd,2019
 
@@ -13,7 +14,6 @@ using Statistics
 using Plots
 using ODBC
 using DataFrames
-using JLD2
 using Dates
 
 
@@ -69,6 +69,34 @@ by(df,[:TypeName,:STA_Status],(:Trade_day_num_30,:TypeName) =>
         x->(trade_mean=mean(skipmissing(x.Trade_day_num_30)), N = length(x.TypeName), N_missing = sum(ismissing.(x.Trade_day_num_30))))
 
 by(full_v2,[:TypeName,:STA_Status],:Trade_day_num_30=> mean, :TypeName=>length)
+
+# new way to do by under dataframe
+ai_df = groupby(cus,:age_today)
+ai_df= combine(ai_df) do x
+      (age_avg       = mean(x.age_today)
+      ,equity_avg   = mean(skipmissing(x.EquityCAD03avg))
+      ,act_avg      = mean(x.act_acct)
+      ,tenure       = mean(x.MTD)
+      ,N            = length(x.act_acct)
+      ,tading       = mean(skipmissing(x.trade_time_lq))
+      ,LiquidAsset  = median(skipmissing(x.LiquidAsset))
+      ,NetWorth     = median(skipmissing(x.NetWorth))
+      ,median_Income       = median(skipmissing(x.Income))
+      ,Income_10       = quantile(skipmissing(x.Income),0.10)
+      ,Income_25       = quantile(skipmissing(x.Income),0.25)
+      ,Income_75       = quantile(skipmissing(x.Income),0.75)
+      ,Income_90       = quantile(skipmissing(x.Income),0.90)
+      ,Income_98       = quantile(skipmissing(x.Income),0.98)
+      )
+end
+
+
+
+
+# change specific column name
+rename!(dff, Dict(:PS_final => "PS_final_25"))
+
+
 
 
 ## function using to count the distinct value in a column
@@ -175,7 +203,6 @@ c= [x == y ? "euqal" : "not" for x in a,y in b]
 
 
 
-
  ## ranking function  floor(tiedrank(x)*k/n+1) n is siae of non-missing value, k is the group uou use.
  df1[!,:asset_rank] = floor.(Int,  tiedrank(df1[!,:TotalAssets_ttl_t12])*10/(length(df1[!,:TotalAssets_ttl_t12]) +1))
  ## function to replace proc rank
@@ -210,8 +237,10 @@ end
 ## get data from sql server
 df=ODBC.query(db,"select ")
 
+# delete a column by name
+select!(df, Not(:count))
 
-
+df[:, All(r"x", :)]
 
 ## scatter plot and line plot in one
 ## function for draw the logit plot, df is the original function,
@@ -225,7 +254,7 @@ function logit_plot(df::DataFrame,x::Symbol,k::Integer,y::Symbol)
 
       df[!,:rank] =  ceil.(Int,tiedrank(df[!,x])*k/(length(df[!,x]) +1))
      ## df1 = by(df,:rank, target = y =>mean, a = x => mean, n= y=>length, cls = y => sum)
-     df1 = by(df,:rank, target = y =>mean, a = x => median, n= y=>length, cls = y => sum)
+      df1 = by(df,:rank, target = y =>mean, a = x => median, n= y=>length, cls = y => sum)
       df1[!,:logit] = [log( (c + 1)/ (d - c + 1) ) for (c,d) in zip(df1[!,:cls],df1[!,:n])]
 
       scatter(df1[!,:a],df1[!,:logit],xlabel=x,ylabel="logit target")
@@ -258,8 +287,10 @@ trade=unstack(df2,:PrimaryClientID,:time_ind,:trade_time)
 ##plot1 = histogram2d(cus_oct_v2[!,:age_today],cus_oct_v2[!,:tenure],nbins=20
 ##      ,c=ColorGradient([:green,:yellow,:blue]))
 ## :blues , :viridis, :magma , :ingerno, :plasma, :'color's (:reds,:greens etc)
+
+## update april 28, 2020 ColorGradient changed to cgrad
 plot1 = histogram2d(cus_oct_v2[!,:age_today],cus_oct_v2[!,:tenure],nbins=25,xlabel="Age",ylabel="Tenure",
-            c=ColorGradient(:blues),title="Age vs. Tenure")
+            c=cgrad(:blues),title="Age vs. Tenure")
 
 ## how to limit your x, y axis,
 plot(y, xlabel = "my label",
@@ -331,6 +362,22 @@ histogram(act[!,:EquityInCAD],fillalpha=0.4,linealpha=0.1, nbins=0:2500:150000
 ,xformatter = x->string("\u0024",Int(x/1e3),"K")
 ,xlabel="Asset",ylabel="Customer Count",legend=false)
 
+
+
+
+## a very customized version of historgram
+histogram(collect(skipmissing(df[(df.cus_seg .== "best"),:EquityCAD09avg])), fillalpha = 0.4, linealpha = 0.1,
+    title = "Equity for best",  xlabel = "Equity" ,ylabel = "Client Count"
+   ,xformatter = x->string("\$",Int(x/1e3),"K"),xticks = 0:50000:400000
+   ,nbins = 0:5000:400000,legend = false)
+
+
+
+
+
+## ploting on subset of the dataframe
+histogram2d(df[(df.cus_seg .== "best"),:Overall_satisfy],df[(df.cus_seg .== "best"),:refer_friends],nbins=25,xlabel="Overall Satisfy",ylabel="refer friends",
+            c=ColorGradient(:blues),title="Overall Satisfy vs. refer friends")
 
 ## sum all columns, or sum all rowa
 A = [1 2; 3 4]
@@ -407,3 +454,206 @@ end
 ## sorting dataframe on multiple columns
 sort!(df, [:a, :x])
 collect(1:3)
+
+
+
+## checking ploting bining
+summarystats(RSP[!,:RSP_fundsin_inseason])
+
+
+
+
+
+
+## want to have cut point at 25,30,40,50,65
+
+## quantile cust
+## age_cuts = quantile(df.age_today,[0.25,0.5,0.75])
+## age_cuts = [-Inf; unique(quantile(df.age_today, 0.25:0.25:0.75)); Inf]
+## absolute cut
+##
+age_cuts = [25,30,40,50,65]
+df.age_ca = cut(df.age_today, age_cuts, extend = true)
+freqtable(df.age_ca)
+levels(df.age_ca)
+
+## assign score to different level
+## df[!,:age_score] = [x=="[30, 40)" ? 10 : x in ("[25, 30)","[40, 50)") ? 8 :
+##                  x in ("[14, 25)","[50, 65)") ? 5 : 0  for x in df[!,:age_ca]]
+
+## method 2: using map function to transfer your data,easy and clean to see
+mycode = Dict(
+              "[14, 25)" => 5,
+              "[25, 30)" => 8,
+              "[30, 40)" => 10,
+              "[40, 50)" => 8,
+              "[50, 65)" => 5,
+              "[65, 101]"=> 0,
+                ##      "" => missing,
+                  )
+df[!,:age_score]= [get(mycode, s, missing) for s in df.age_ca]
+
+trade_cuts =[minimum(skipmissing(df[!,:trade_time_lq])),1,5,10,30,maximum(skipmissing(df[!,:trade_time_lq]))]
+
+
+## delete a column by name
+delete!(df,:trade_ca)
+select!(df,Not(:trade_ca)) ## new version
+
+## remove column 3
+df = df[:,[1:2,4:end]]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+## animate plots works version
+anim = Animation()
+for i in 2018:2020
+    bar(df[df.year .== i,:month],df[df.year .== i,:cutomer_count]
+        ,fillalpha = 0.4, linealpha = 0.1,legend = false
+        ,ylims  = (0,400000)
+        ,yticks = 0:50000:400000
+        ,xlims  = (0,12)
+        ,xticks = 1:1:12
+        ,yformatter = x->string(Int(x/1e3),"K")
+        ,title = "Year $i Distribution"
+        ,nbins = 1:1:12)
+    frame(anim)
+end
+
+gif(anim,fps = 0.5)
+
+
+
+## add number to a exsit vector
+gain_cuts = append!([minimum(skipmissing(cus[!,:equity_pct_change]))],collect(-1:0.1:1))
+gain_cuts = append!(gain_cuts,[maximum(skipmissing(cus[!,:equity_pct_change]))])
+
+
+
+
+
+
+
+
+
+
+
+
+##########################
+# get a substring
+s= "N2N1W1"
+
+SubString("N2N1W1", 2)
+SubString("N2N1W1", 1,5)
+SubString("N2N1W1", 2:4)
+chop("N2N1W1", head=0, tail=2)
+s[1:5]
+
+
+df[!,:Postal_l5] = [ ismissing(x) ? missing : chop(strip(x),head=0,tail=1) for x in df[!,:PC_ref]]
+
+## before do anything, check your postalcode formal
+df[!,:PC_size] = sizeof.(df[!,:PostalCode])
+
+maximum(sizeof.(df[!,:PostalCode]))
+minimum(sizeof.(df[!,:PostalCode]))
+
+
+# check the postalcode meet format and standize the letter
+# \w could be num and word, \D is non dig
+occursin(r"^\D\d\D\d\D\d$","a1d3f4")
+r"^\D\d\D\d\D\d$"
+
+df[!,:PC_ref] = [ismissing(x) ? missing :
+                 occursin(r"^\D\d\D\d\D\d$",x) ? uppercase(x) : missing
+                 for x in df[!,:PostalCode]]
+
+
+
+
+
+
+
+##
+function Anonymize_Check(df::DataFrame, vars::Vector)
+      test  = groupby(df, vars)
+      test2 = combine(test, :PrimaryClientID =>length => :cus_count)
+
+      count_values_of_allvar = length(test2[test2.cus_count .> 1,:cus_count])
+      new_row_count          = sum(test2[test2.cus_count .> 1,:cus_count])
+      suppressed_row_count   = sum(test2[test2.cus_count .== 1,:cus_count])
+
+      avg_risk = new_row_count == 0 ? "--" : count_values_of_allvar/new_row_count
+
+      println("""Anoymize Check
+      suppressed rows count = $suppressed_row_count
+      new rows count        = $new_row_count
+      Average Risk          = $avg_risk
+      """)
+end
+Anonymize_Check(df,[:age_today ,:MTD])
+
+
+
+
+
+
+
+
+###########
+## date manipulation
+
+## date manipulate, right 4 digit is year
+paid_search[!,:year]  = [parse(Int,x[end-3:end]) for x in paid_search[!,:MonthStart]]
+paid_search[!,:month] = [parse(Int,x[1:findfirst('/',x)-1]) for x in paid_search[!,:MonthStart]]
+
+
+
+# dataframe long to wide
+pd_search_w   = unstack(paid_search, [:year,:month],:Campaign,:Sessions, renamecols=x->Symbol(x,"_Sessions"))
+
+
+
+
+##
+# passmissing() vs. skipmissing()
+# animate it
+# handle missing solve your problem
+anim = Animation()
+plot(
+     paid_search_f[!, :cutomer_count]
+    ,paid_search_f[! , :Branded_Sessions])
+for (i,j) in zip(paid_search_f[!,:year],paid_search_f[!,:month])
+    plot!(
+         paid_search_f[(paid_search_f.year .== i).& (paid_search_f.month .== j), :cutomer_count]
+        ,paid_search_f[(paid_search_f.year .== i).& (paid_search_f.month .== j), :Branded_Sessions]
+        ,seriestype = :scatter
+        ,fillalpha = 0.4, linealpha = 0.1,legend = false
+        ,ylims  = (0,800000)
+        ,yticks = 0:100000:800000
+        ,xlims  = (250000,400000)
+        ,xticks = 250000:50000:400000
+        ,yformatter = x->string(Int(x/1e3),"K")
+        ,xformatter = x->string(Int(x/1e3),"K")
+        ,title = "Year $i Month $j"
+        ,xlabel = "Active Customer"
+        ,ylabel = "Branded Sessions")
+    frame(anim)
+end
+
+gif(anim,fps = 2)
