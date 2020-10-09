@@ -31,6 +31,32 @@ df2= CSV.read("C:\\Users\\012790\\Desktop\\cus_journey\\asset_full_clean.csv",mi
 
 
 
+
+
+## data manipulation
+# replace and modify cell
+
+
+replace("(514) 679-5704 ",[' ','(',')','-']=>"")
+
+#= cell situation
+      1. have blanks
+      2. have ()
+      3. start with 1
+      4. have -
+      5. has extention  X....
+
+=#
+
+# don't use substring in this, otherwise will get result like "123" instead 123
+new = [ismissing(x) ? missing : replace(x,[' ','(',')','-']=>"") for x in cell[!,:DaytimePhone]]
+new = [ismissing(x) ? missing : occursin(r"^1",x) ? x[2:length(x)] : x for x in new]
+new = [ismissing(x) ? missing : occursin(r"X|x",x) ? x[1:collect(findlast("X",uppercase(x)))[1]-1] : x for x in new]
+
+sort(freqtable(new),rev =true)
+
+
+
 ## Try to write one function  return all the results
 ## add dispatch for a list of cols
 ## elseif  eltype(full[!,i]) == Union{Missing, Date} || eltype(full[!,i]) ==  Date
@@ -91,8 +117,148 @@ ai_df= combine(ai_df) do x
 end
 
 
+# group by age bin
+age_cuts = [20,25,30,35,40,45,50,55,60,65]
+dff.age_ca = cut(dff.age_today, age_cuts, extend = true)
+freqtable(dff.age_ca)
+levels(dff.age_ca)
 
 
+ai_df = groupby(dff,:age_ca)
+ai_df= combine(ai_df) do x
+      (age_avg       = mean(x.age_today)
+      ,equity_avg   = mean(skipmissing(x.Equity0925))
+      ,act_avg      = mean(x.act_acct)
+      ,tenure       = mean(x.MTD)
+      ,N            = length(x.act_acct)
+      ,LiquidAsset  = median(skipmissing(x.LiquidAsset))
+      ,NetWorth     = median(skipmissing(x.NetWorth))
+      ,median_Income   = median(skipmissing(x.Income))
+      ,Income_10       = quantile(skipmissing(x.Income),0.10)
+      ,Income_25       = quantile(skipmissing(x.Income),0.25)
+      ,Income_75       = quantile(skipmissing(x.Income),0.75)
+      ,Income_90       = quantile(skipmissing(x.Income),0.90)
+      ,Equity0925_median   = median(skipmissing(x.Equity0925))
+      ,Equity0925_10       = quantile(skipmissing(x.Equity0925),0.10)
+      ,Equity0925_25       = quantile(skipmissing(x.Equity0925),0.25)
+      ,Equity0925_75       = quantile(skipmissing(x.Equity0925),0.75)
+      ,Equity0925_90       = quantile(skipmissing(x.Equity0925),0.90)
+      ,LiquidAsset_median   = median(skipmissing(x.LiquidAsset))
+      ,LiquidAsset_10       = quantile(skipmissing(x.LiquidAsset),0.10)
+      ,LiquidAsset_25       = quantile(skipmissing(x.LiquidAsset),0.25)
+      ,LiquidAsset_75       = quantile(skipmissing(x.LiquidAsset),0.75)
+      ,LiquidAsset_90       = quantile(skipmissing(x.LiquidAsset),0.90)
+      ,Liabilities_median   = median(skipmissing(x.Liabilities))
+      ,Liabilities_10       = quantile(skipmissing(x.Liabilities),0.10)
+      ,Liabilities_25       = quantile(skipmissing(x.Liabilities),0.25)
+      ,Liabilities_75       = quantile(skipmissing(x.Liabilities),0.75)
+      ,Liabilities_90       = quantile(skipmissing(x.Liabilities),0.90)
+      ,NetWorth_median   = median(skipmissing(x.NetWorth))
+      ,NetWorth_10       = quantile(skipmissing(x.NetWorth),0.10)
+      ,NetWorth_25       = quantile(skipmissing(x.NetWorth),0.25)
+      ,NetWorth_75       = quantile(skipmissing(x.NetWorth),0.75)
+      ,NetWorth_90       = quantile(skipmissing(x.NetWorth),0.90)
+      )
+end
+
+# plot by Liabilities by categorical Array
+plot(String.(ai_df[!,:age_ca]), ai_df[!,:Liabilities_90],  label = ("Liabilities 90%")
+      ,yformatter = x->string("\$",Int(x/1e3),"K")
+      ,yticks = 0:200000:2000000
+      ,title=" Liabilities Trajectory"
+      ,xlabel="Age",ylabel="Liabilities"
+      ,legend=:topleft
+      )
+plot!(String.(ai_df[!,:age_ca]), ai_df[!,:Liabilities_median],  label = ("Liabilities Median"))
+plot!(String.(ai_df[!,:age_ca]), ai_df[!,:Liabilities_10],      label = ("Liabilities 10%"))
+plot!(String.(ai_df[!,:age_ca]), ai_df[!,:Liabilities_25],      label = ("Liabilities 25%"))
+plot!(String.(ai_df[!,:age_ca]), ai_df[!,:Liabilities_75],      label = ("Liabilities 75%"))
+
+
+# plot by equity
+plot(String.(ai_df[!,:age_ca]), ai_df[!,:Equity0925_10],  label = ("Equity 10%")
+      ,yformatter = x->string("\$",Int(x/1e3),"K")
+      ,yticks = 0:30000:300000
+      ,title=" Investment Trajectory"
+      ,xlabel="Age",ylabel=" Equity0925"
+      ,legend=:topleft
+      )
+plot!(String.(ai_df[!,:age_ca]), ai_df[!,:Equity0925_25],  label = ("Equity 25%"))
+plot!(String.(ai_df[!,:age_ca]), ai_df[!,:Equity0925_median],      label = ("Equity median"))
+plot!(String.(ai_df[!,:age_ca]), ai_df[!,:Equity0925_75],      label = ("Equity 75%"))
+plot!(String.(ai_df[!,:age_ca]), ai_df[!,:Equity0925_90],      label = ("Equity 90%"))
+
+
+
+# histogram
+
+histogram(
+      collect(skipmissing(df[!,:EquityInCAD_q1_avg])),
+      fillalpha = 0.4,
+      linealpha = 0.1,
+      legend = false,
+      title = "Equity Distribution",
+      xlabel = "first quarter Equity Average",
+      ylabel = "Count of Customer",
+      xformatter = x->string("\$",Int(x/1e3),"K"),
+#      xticks = 0:50000:200000,
+#      yformatter = x->string(Int(x/1000),"K"),
+      nbins = -5000:1000:30000,
+)
+plot!([median(skipmissing(df[!,:EquityInCAD_q1_avg]))], seriestype="vline", label="Median"
+      ,linestyle = :dash,xformatter = x->string("\$",Int(x/1e3),"K"))
+
+
+# density histogram, plot as percentage
+
+histogram(
+      collect(skipmissing(df[!,:age_join])),
+      normalize = :pdf,
+      fillalpha = 0.4,
+      linealpha = 0.1,
+      legend = false,
+      title = "Age Distribution",
+      xlabel = "Age when join",
+      ylabel = "percentage of client of Customer",
+#      xticks = 0:50000:200000,
+      nbins = 18:1:80,
+)
+
+
+
+############
+# density plot comparision
+# compare version
+
+histogram(
+      collect(skipmissing(df[!,:age_join])),
+      normalize = :pdf,
+      fillalpha = 0.4,
+      linealpha = 0.1,
+      title = "Age Distribution",
+      xlabel = "Age when join",
+      ylabel = "Percentage of Clients",
+      label = "Fraud clients",
+      nbins = 18:1:80
+)
+histogram!(
+      collect(skipmissing(cus[!,:age_join])),
+      normalize = :pdf,
+      fillalpha = 0.4,
+      linealpha = 0.1,
+      label = "QT clients",
+      nbins = 18:1:80
+)
+plot!([median(skipmissing(cus[!,:age_join]))], seriestype="vline", label="QT Median"
+      ,linestyle = :dash,
+      yformatter = x->string(Int(x*100),"%"))
+
+
+
+
+
+
+################################################################################
 # change specific column name
 rename!(dff, Dict(:PS_final => "PS_final_25"))
 
@@ -108,7 +274,8 @@ df2 = df[[x in ["IN","FX"] for x in df[!,:AccountClass]], :]
 ## if the column contain missing value, then doesn't work, have to add in filter to filter out missing, these three conditions' sequence doesn't matter
 WM_WM = df[(df.ind_t12 .!== missing) .& (df.ind_t0 .== "WM") .& (df.ind_t12 .== "WM") , :]
 df2= df[(df.rsp_check .== "first not RSP") .& (x in ["SD","WM","multi-class"] for x in df[!,:classtype]) ,:]
-
+# for not in certain values
+b = df[(df.province .!== missing) .& (x ∉ ["Quebec","Northwest Territories","Nunavut","Yukon"] for x in df[!,:province]),[:rank_ver_3_0,:insurability]]
 
 #####################################################
 ## different types of conversion
@@ -158,7 +325,8 @@ df1[!,:AccountNumber] = [string(x) for x in df1[!,:AccountNumber]]
 ## type 2: string convert to numberic. Convert x to a value of type T. T is integer type, string to date works as well.
 convert(T, x)
 
-
+# sort dataframe by a column
+sort(a,:N,rev=true)
 
 ## check how to use a function
 methods(disallowmissing!)
@@ -201,6 +369,10 @@ c= [x == y ? "euqal" : "not" for x in a,y in b]
 
 
 
+# regular expression to detect and replace
+df[!,:PC_ref] = [ismissing(x) ? missing :
+                 occursin(r"^\D\d\D\s*\d\D\d$",x) ? uppercase(replace(x,r"\s*"=>"")) : missing
+                 for x in df[!,:PostalCode]]
 
 
  ## ranking function  floor(tiedrank(x)*k/n+1) n is siae of non-missing value, k is the group uou use.
@@ -366,7 +538,8 @@ histogram(act[!,:EquityInCAD],fillalpha=0.4,linealpha=0.1, nbins=0:2500:150000
 
 
 ## a very customized version of historgram
-histogram(collect(skipmissing(df[(df.cus_seg .== "best"),:EquityCAD09avg])), fillalpha = 0.4, linealpha = 0.1,
+histogram(collect(skipmissing(df[(df.cus_seg .== "best"),:EquityCAD09avg])),
+      fillalpha = 0.4, linealpha = 0.1,
     title = "Equity for best",  xlabel = "Equity" ,ylabel = "Client Count"
    ,xformatter = x->string("\$",Int(x/1e3),"K"),xticks = 0:50000:400000
    ,nbins = 0:5000:400000,legend = false)
@@ -376,8 +549,16 @@ histogram(collect(skipmissing(df[(df.cus_seg .== "best"),:EquityCAD09avg])), fil
 
 
 ## ploting on subset of the dataframe
-histogram2d(df[(df.cus_seg .== "best"),:Overall_satisfy],df[(df.cus_seg .== "best"),:refer_friends],nbins=25,xlabel="Overall Satisfy",ylabel="refer friends",
-            c=ColorGradient(:blues),title="Overall Satisfy vs. refer friends")
+# clims=(-0.005,0.005) for color scale control
+histogram2d(
+      df[(df.cus_seg.=="best"), :Overall_satisfy],
+      df[(df.cus_seg.=="best"), :refer_friends],
+      nbins = 25,
+      xlabel = "Overall Satisfy",
+      ylabel = "refer friends",
+      c = ColorGradient(:blues),
+      title = "Overall Satisfy vs. refer friends",
+)
 
 ## sum all columns, or sum all rowa
 A = [1 2; 3 4]
