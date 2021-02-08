@@ -27,11 +27,11 @@ df= CSV.read("C:\\Users\\012790\\Desktop\\notebook\\Julia\\full_clean_489.csv")
 df2= CSV.read("C:\\Users\\012790\\Desktop\\cus_journey\\asset_full_clean.csv",missingstring="NULL")
 
 ## check your data type and data names
-[names(df) eltypes(df)]
+[names(df) eltype.(eachcol(df))]
 
 
 
-
+CSV.write("C:\\Users\\012790\\Desktop\\fraud\\cus_93_full_EA.csv",full)
 
 ## data manipulation
 # replace and modify cell
@@ -41,6 +41,7 @@ replace("(514) 679-5704 ",[' ','(',')','-']=>"")
 
 #= cell situation
       1. have blanks
+
       2. have ()
       3. start with 1
       4. have -
@@ -49,13 +50,31 @@ replace("(514) 679-5704 ",[' ','(',')','-']=>"")
 =#
 
 # don't use substring in this, otherwise will get result like "123" instead 123
-new = [ismissing(x) ? missing : replace(x,[' ','(',')','-']=>"") for x in cell[!,:DaytimePhone]]
-new = [ismissing(x) ? missing : occursin(r"^1",x) ? x[2:length(x)] : x for x in new]
-new = [ismissing(x) ? missing : occursin(r"X|x",x) ? x[1:collect(findlast("X",uppercase(x)))[1]-1] : x for x in new]
+cell_cus[!,:cell_modify] = [ismissing(x) ? missing : replace(x,['*','+',' ','(',')','-']=>"") for x in cell_cus[!,:DaytimePhone]]
+cell_cus[!,:cell_modify] = [ismissing(x) ? missing : occursin(r"^1",x) ? x[2:length(x)] : x for x in cell_cus[!,:cell_modify]]
+cell_cus[!,:cell_modify] = [ismissing(x) ? missing : occursin(r"X|x",x) ? x[1:collect(findlast("X",uppercase(x)))[1]-1] : x for x in cell_cus[!,:cell_modify]]
+# keep only numers
+cell_cus[!,:cell_modify] = [ismissing(x) ? missing : occursin(r"\D",x) ? replace(x,r"\D"=>"") : x for x in cell_cus[!,:cell_modify]]
+cell_cus[!,:cell_modify] = [ismissing(x) ? missing : occursin(r"^\d{10}$",x) ? x : missing for x in cell_cus[!,:cell_modify]]
 
-sort(freqtable(new),rev =true)
+sort(freqtable(cell_cus[!,:cell_modify]),rev =true)
 
 
+cell_cus[!,:area_code] = [ismissing(x) ? missing : x=="" ? missing : x[1:3] for x in cell_cus[!,:cell_modify]]
+sort(freqtable(cell_cus[!,:area_code]),rev =true)
+
+
+cell_cus[!,:area_aggregate] = [ismissing(x) ? missing :
+                              x in ("416","437","647") ? "416/437/647" :
+                              x in ("403","587","825") ? "403/587/825" :
+                              x in ("519","226","548") ? "519/226/548" :
+                              x in ("418","367","581") ? "418/367/581" :
+                              x in ("778","250","236") ? "778/250/236" :
+                              x in ("905","289","365") ? "905/289/365" :
+                              x in ("613","343") ? "613/343" :
+                              x in ("514","438") ? "514/438" : x
+                              for x in cell_cus[!,:area_code]]
+sort(freqtable(cell_cus[!,:area_aggregate]),rev =true)
 
 ## Try to write one function  return all the results
 ## add dispatch for a list of cols
@@ -189,6 +208,37 @@ plot!(String.(ai_df[!,:age_ca]), ai_df[!,:Equity0925_75],      label = ("Equity 
 plot!(String.(ai_df[!,:age_ca]), ai_df[!,:Equity0925_90],      label = ("Equity 90%"))
 
 
+#
+# look at distribution
+freqtable(df[!,:close_type])
+summarystats(df[!,:tenure])
+
+histogram(
+      df[!,:tenure],
+      fillalpha = 0.4,
+      linealpha = 0.1,
+#      legend = false,
+      normalize = :pdf,
+      group =  df[!,:close_type],
+      title = "Tenure Distribution",
+      xlabel = "Tenure by month",
+      ylabel = "Percentage of Customer",
+      xticks = 0:12:48,
+#      yformatter = x->string(Int(x/1000),"K"),
+      nbins = 0:1:50,
+)
+plot!([median(df[df.close_type .== "Attrited",:tenure])], seriestype="vline"
+      ,label="Attried Med = $(median(df[df.close_type .== "Attrited",:tenure]))"
+      ,linestyle = :dash)
+plot!([median(df[df.close_type .== "swap",:tenure])], seriestype="vline"
+      ,label="swap Med = $(median(df[df.close_type .== "swap",:tenure]))"
+      ,linestyle = :dash)
+plot!([median(df[df.close_type .== "concentrated",:tenure])], seriestype="vline"
+      ,label="concentrated Med = $(median(df[df.close_type .== "concentrated",:tenure]))"
+      ,linestyle = :dash
+      ,yformatter = x->string(round(x*100,digits =0),"%"))
+
+
 
 # histogram
 
@@ -274,6 +324,11 @@ df2 = df[[x in ["IN","FX"] for x in df[!,:AccountClass]], :]
 ## if the column contain missing value, then doesn't work, have to add in filter to filter out missing, these three conditions' sequence doesn't matter
 WM_WM = df[(df.ind_t12 .!== missing) .& (df.ind_t0 .== "WM") .& (df.ind_t12 .== "WM") , :]
 df2= df[(df.rsp_check .== "first not RSP") .& (x in ["SD","WM","multi-class"] for x in df[!,:classtype]) ,:]
+df[in.(df[!,:SIN], (l,)), :]
+
+
+
+df[in(["Forex","Margin"]).(df.cus_type3), :age_today]
 # for not in certain values
 b = df[(df.province .!== missing) .& (x ∉ ["Quebec","Northwest Territories","Nunavut","Yukon"] for x in df[!,:province]),[:rank_ver_3_0,:insurability]]
 
@@ -377,12 +432,16 @@ df[!,:PC_ref] = [ismissing(x) ? missing :
 
  ## ranking function  floor(tiedrank(x)*k/n+1) n is siae of non-missing value, k is the group uou use.
  df1[!,:asset_rank] = floor.(Int,  tiedrank(df1[!,:TotalAssets_ttl_t12])*10/(length(df1[!,:TotalAssets_ttl_t12]) +1))
+
+
+
+
  ## function to replace proc rank
  ## 1. indicate your group number
 function rank(x::AbstractVector,k::Integer)
     ceil.(Int,tiedrank(x)*k/(length(x) +1))
 end
-## 2. indicate the interval you want
+# 2. indicate the interval you want
 function rank(x::AbstractVector,p::AbstractFloat)
     0< p <=1 || error("p must between 0 to 1")
 isinteger(1/p) || error("need ratio be exact divided by 1")
@@ -838,3 +897,31 @@ for (i,j) in zip(paid_search_f[!,:year],paid_search_f[!,:month])
 end
 
 gif(anim,fps = 2)
+
+
+
+
+
+####################
+# two ways to find all matchs for position detect
+findall(r"\w+\s+",s[1]) # this return a range
+
+getfield.(collect(eachmatch(r"\w+\s+", s[1])), [:offset]) # this return a list of start point
+
+
+
+df = DataFrame()
+for i in 1:length(p_s)
+    df[!,c_n[i]]= string.(SubString.(s,p_s[i],p_e[i]))
+end
+df[!,:other] = string.(SubString.(s,last(p_e)+1))
+
+
+occursin(r"\d+", df[1,2])
+occursin(r"\d+", df[1,1])
+
+
+
+
+s= readlines("C:\\Users\\012790\\Desktop\\Equifax_Customer_Data\\EFX_File3", keep=true)
+s =[x[1:270] for x in s]
