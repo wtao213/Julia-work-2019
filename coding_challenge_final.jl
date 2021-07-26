@@ -37,7 +37,7 @@ function test(group,find_byb,df_remain,l,a,b)
     group = [group;find_byb]
     group2,find_byb,df_remain,l=finda(df_remain,a,b,l)
     group = [group;group2]
-    test(group,find_byb,df_remain,l)
+    test(group,find_byb,df_remain,l,a,b)
    end
 end
 
