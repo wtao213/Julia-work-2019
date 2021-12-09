@@ -124,7 +124,7 @@ trade_t_3_qvals = convert(Vector{Float64}, score[!, :trade_t_3_qvals])
 [pcuts trade_t_3_qvals]
 
 
-wblip = LinearInterpolation(trade_t_3_qvals, pcuts, extrapolation_bc = Flat())
+wblip = LinearInterpolation(Interpolations.deduplicate_knots!(trade_t_3_qvals), pcuts, extrapolation_bc = Flat())
 df[!, :trade_t_3_score_lip] = [ismissing(x) ? 0 : wblip(x) for x in df[!, :trade_t_3]]
 
 freqtable(df[!, :trade_t_3_score_lip])
@@ -204,7 +204,7 @@ summarystats(df[!, :age_group_quantile])
 
 pcuts = score[!, :pcuts]
 age_group_quantile_qvals = convert(Vector{Float64}, score[!, :age_group_quantile_qvals])       # find data values
-wblip = LinearInterpolation(age_group_quantile_qvals, pcuts, extrapolation_bc = Flat())
+wblip = LinearInterpolation(Interpolations.deduplicate_knots!(age_group_quantile_qvals), pcuts, extrapolation_bc = Flat())
 
 
 ########
@@ -244,7 +244,7 @@ df[!, :WSMORTAVG] = df[!, :WSMORT_potential] ./ df[!, :WSMORT_incidence]
 # add in too new tenure customers
 DF = vcat(df, df_new, df_missing, cols = :union)
 
-
+freqtable(DF[!, :segments_ind])
 ################################################
 #
 ###############

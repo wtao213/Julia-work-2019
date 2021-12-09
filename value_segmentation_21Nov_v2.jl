@@ -139,9 +139,11 @@ trade_t_3_qvals = round.(quantile(collect(skipmissing(df[!, :trade_t_3])), pcuts
 [pcuts trade_t_3_qvals]
 
 
-wblip = LinearInterpolation(trade_t_3_qvals, pcuts, extrapolation_bc = Flat())
+wblip = LinearInterpolation(Interpolations.deduplicate_knots!(trade_t_3_qvals), pcuts, extrapolation_bc = Flat())
+#wblip = LinearInterpolation(trade_t_3_qvals, pcuts, extrapolation_bc = Flat())
 df[!, :trade_t_3_score_lip] = [ismissing(x) ? 0 : wblip(x) for x in df[!, :trade_t_3]]
-
+#df[!, :trade_t_3_score_lip_v2] = [ismissing(x) ? 0 : wblip(x) for x in df[!, :trade_t_3]]
+#freqtable(df[!, :trade_t_3_score_lip] .== df[!, :trade_t_3_score_lip_v2])
 
 freqtable(df[!, :trade_t_3_score_lip])
 
@@ -230,7 +232,7 @@ summarystats(df[!, :age_group_quantile])
 
 pcuts = 0.0:0.05:1.0                       # desired percentiles
 age_group_quantile_qvals = round.(quantile(collect(skipmissing(df[!, :age_group_quantile])), pcuts))        # find data values
-wblip = LinearInterpolation(age_group_quantile_qvals, pcuts, extrapolation_bc = Flat())
+wblip = LinearInterpolation(Interpolations.deduplicate_knots!(age_group_quantile_qvals), pcuts, extrapolation_bc = Flat())
 
 ########
 # lower income in age group are in top ranking, using aseding rank of inceome
