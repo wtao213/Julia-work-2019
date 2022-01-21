@@ -35,9 +35,21 @@ CSV.write("C:\\Users\\012790\\Desktop\\fraud\\cus_93_full_EA.csv",full)
 
 ## data manipulation
 # replace and modify cell
-
+# replace NaN to missing, NaN due to one info incomplete
+df3[!,:WSINVEIR_potential]=[ismissing(x) ? x : isnan(x) ? repalce(x,NaN => missing) : x for x in df3[!,:WSINVEIR_potential]]
+replace!(df3[!,:WSSAVNOS_potential], NaN=>missing)
 
 replace("(514) 679-5704 ",[' ','(',')','-']=>"")
+
+# replace certain range to a value
+replace(x -> x>300000 ? 300000 : x, df[!,:Income])
+
+
+
+# filter all columns with same surffix
+df_extra2= df_extra[!,filter(x -> occursin.(r"^Equity",x), names(df_extra))]
+df_extra2= df_extra[!,["PrimaryClientID"; filter(x -> occursin.(r"^Equity",x), names(df_extra));"trade_t_3"]]
+
 
 #= cell situation
       1. have blanks
@@ -75,6 +87,32 @@ cell_cus[!,:area_aggregate] = [ismissing(x) ? missing :
                               x in ("514","438") ? "514/438" : x
                               for x in cell_cus[!,:area_code]]
 sort(freqtable(cell_cus[!,:area_aggregate]),rev =true)
+
+
+
+
+
+# want to get the rank within each group
+df2 = combine(groupby(df,:age_t0),sdf -> sort(sdf,:Income), s->(rank=1:nrow(s),), nrow => :n)
+# or using transform
+df2 =transform(groupby(df,:age_t0), sdf -> sort(sdf,:Income), s->(rank=1:nrow(s),), nrow => :n)
+
+
+
+
+## transpose the data frame to nuew way
+trade_per_client = unstack(ai_df, :PrimaryClientID, :TradeDate2, :N_trade_s)
+
+
+
+# fill missing to 0 for the whole dataframe
+for col in eachcol(trade_per_client)
+       replace!(col, missing=>0)
+end
+
+
+
+
 
 ## Try to write one function  return all the results
 ## add dispatch for a list of cols
@@ -177,8 +215,17 @@ ai_df= combine(ai_df) do x
       ,NetWorth_25       = quantile(skipmissing(x.NetWorth),0.25)
       ,NetWorth_75       = quantile(skipmissing(x.NetWorth),0.75)
       ,NetWorth_90       = quantile(skipmissing(x.NetWorth),0.90)
+      ,median_TCMG031   = median(skipmissing(filter(x -> x>0, x.TCMG031)))  #only work on certain range values
       )
 end
+
+
+
+using StatsBase
+
+fh = fit(Histogram, [n1; n2], nbins=80)
+
+
 
 # plot by Liabilities by categorical Array
 plot(String.(ai_df[!,:age_ca]), ai_df[!,:Liabilities_90],  label = ("Liabilities 90%")
@@ -290,6 +337,7 @@ histogram(
       ylabel = "Percentage of Clients",
       label = "Fraud clients",
       nbins = 18:1:80
+
 )
 histogram!(
       collect(skipmissing(cus[!,:age_join])),
@@ -299,8 +347,7 @@ histogram!(
       label = "QT clients",
       nbins = 18:1:80
 )
-plot!([median(skipmissing(cus[!,:age_join]))], seriestype="vline", label="QT Median"
-      ,linestyle = :dash,
+plot!([median(skipmissing(cus[!,:age_join]))],
       yformatter = x->string(Int(x*100),"%"))
 
 
@@ -523,6 +570,20 @@ trade=unstack(df2,:PrimaryClientID,:time_ind,:trade_time)
 plot1 = histogram2d(cus_oct_v2[!,:age_today],cus_oct_v2[!,:tenure],nbins=25,xlabel="Age",ylabel="Tenure",
             c=cgrad(:blues),title="Age vs. Tenure")
 
+#
+histogram2d(dff[!,:Equity_t0]
+            ,dff[!,:EquityInCAD_t_3_diff]
+            ,nbins=10
+            ,xlabel="Equity T0"
+            ,ylabel="EquityInCAD_t_3_diff"
+            ,c=cgrad(:blues)
+            ,clims=(0, 5000)
+            ,title="Equity vs. EquityInCAD_t_3_diff")
+plot!(xformatter = x->string("\$",Int(x/1e3),"K")
+      ,yformatter = x->string("\$",Int(x/1e3),"K"))
+
+
+
 ## how to limit your x, y axis,
 plot(y, xlabel = "my label",
                 xlims = (0,10),
@@ -605,6 +666,87 @@ histogram(collect(skipmissing(df[(df.cus_seg .== "best"),:EquityCAD09avg])),
 
 
 
+##
+#
+histogram(
+      df[df.FICO_8_0_SCORE .> 0,:FICO_8_0_SCORE],
+      fillalpha = 0.4,
+      linealpha = 0.1,
+      title = "FICO Score Distribution",
+      label =" FICO score",
+      xlabel = "FICO SCORE",
+      ylabel = "Count of Customer",
+      xticks = 400:50:900,
+      legend =:topleft
+#      nbins = -5000:1000:30000,
+)
+plot!([median(skipmissing(df[df.FICO_8_0_SCORE .> 0,:FICO_8_0_SCORE]))], seriestype="vline"
+     , label="Median = $(median(skipmissing(df[df.FICO_8_0_SCORE .> 0,:FICO_8_0_SCORE])))"
+      ,linestyle = :dash
+      ,yformatter = x->string(Int(x/1e3),"K"))
+plot!([quantile(skipmissing(df[df.FICO_8_0_SCORE .> 0,:FICO_8_0_SCORE]),0.1)]
+     , seriestype="vline", label="Bottom 10% = $(quantile(df[df.FICO_8_0_SCORE .> 0,:FICO_8_0_SCORE],0.1))"
+      ,linestyle = :dash)
+
+
+#
+# look at df[!,:TCAM031]
+Med = string("\$",round(median(skipmissing(df[(df.TCAM031 .!==missing) .&(df.TCAM031 .>0),:TCAM031]))/1e3,digits= 1),"K")
+histogram(
+      collect(skipmissing(df[(df.TCAM031 .!==missing) .&(df.TCAM031 .>0),:TCAM031])),
+      fillalpha = 0.4,
+      linealpha = 0.1,
+      title = "All Trade lines Balance Distribution",
+      label = "All Balance",
+      xlabel = "All Trade lines Balance",
+      ylabel = "Count of Customer",
+      xticks = 0:50000:500000,
+      nbins = 0:5000:500000,
+#      legend =:topleft
+)
+plot!([median(skipmissing(df[(df.TCAM031 .!==missing) .&(df.TCAM031 .>0),:TCAM031]))], seriestype="vline"
+     , label="Median = $(Med)"
+      ,linestyle = :dash
+      ,xformatter = x->string("\$",Int(x/1e3),"K")
+      ,yformatter = x->string(Int(x/1e3),"K")
+      )
+plot!([median(skipmissing(df[!,:Equity_t0]))]
+      ,seriestype="vline", label="Median =\$$(round(Int,median(skipmissing(df[!,:Equity_t0]))/1e3))K"
+      ,xformatter = x->string("\$",Int(x/1e3),"K")
+      ,yformatter = x->string(Int(x/1000),"K")
+      ,linestyle = :dash)
+
+#########################################
+# add second y axis to the plot need package Measures
+# add second axis
+plot(df2[!,:yr_mth],df2[!,:acct_closing]
+      ,marker=([:hex :d])
+      ,markersize =2
+      ,markeralpha = 0.5
+      ,legend = :topleft
+      ,yformatter = x->string(round(Int,x/1000),"K")
+      ,label = "Closing Account"
+      )
+plot!(twinx(), df2[!,:act_ct]
+      ,marker=([:hex :d])
+      ,color=:red
+      ,markersize =2
+      ,markeralpha = 0.5
+      ,legend = :topright
+      ,yformatter = x->string(round(Int,x/1000),"K")
+      ,label = "Active Account"
+      ,ylabel = "Active Account Count"
+      )
+plot!(title   = "Closing Account per Month"
+      ,xlabel = "Year Month"
+      ,ylabel = "Close Account Count"
+      ,right_margin =12mm
+      ,xticks=(17)
+      ,xrotation = 30)
+savefig("C:\\Users\\012790\\Desktop\\attrition_2021\\close_vs_active.png")
+
+
+
 
 
 ## ploting on subset of the dataframe
@@ -626,6 +768,14 @@ sum(A, 1)
 # sum all columns value in a row
 sum(A, 2)
 
+
+## months between different dates
+length(start_date:Month(1):end_date)
+
+
+## find the row contain certain string in a list of strings
+l=["CIBC","SCOTIA","TDCT","NATIONAL","RBC","ROYAL","TD CANADA TRUST","BMO","BANK OF MONTREAL","HSBC"]
+HELOC[(sum(occursin.(l, x)) for x in HELOC[!,:member]) .> 0,:]
 
 
 ## name the dafaframe columns
@@ -925,3 +1075,22 @@ occursin(r"\d+", df[1,1])
 
 s= readlines("C:\\Users\\012790\\Desktop\\Equifax_Customer_Data\\EFX_File3", keep=true)
 s =[x[1:270] for x in s]
+
+
+
+
+
+
+
+
+
+###############################
+#
+v =[1,2,3,4,5,6,7,8,9,10]
+
+accumulate(*,v)
+accumulate(+,v)
+
+
+# look at the column have number only
+df[dftypes ,<: Numeric]
